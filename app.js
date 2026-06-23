@@ -20,11 +20,13 @@
   // ---- 状態 ------------------------------------------------------------------
   var players = {};         // { A: YT.Player, B: YT.Player }
   var ready = { A: false, B: false };
+  var slotSong = { A: null, B: null }; // 各スロットに読み込まれている曲
   var activeSlot = "A";     // 現在前面に出ているスロット
   var current = null;       // 再生中の曲
   var preloaded = null;     // 裏で準備済みの曲
   var prefs = {};           // 特徴トークン -> スコア
   var recent = [];          // 直近に流した曲 id
+  var blocked = {};         // 再生不可（埋め込み無効/削除等）の曲 id
   var history = [];         // { song, judged, applied } の配列（前後移動用）
   var histIndex = -1;       // history 内の現在位置
   var segTimer = null;      // 区間タイマー
@@ -57,7 +59,8 @@
       },
       events: {
         onReady: function () { ready[slot] = true; maybeStart(); },
-        onStateChange: function (e) { onState(slot, e); }
+        onStateChange: function (e) { onState(slot, e); },
+        onError: function (e) { onError(slot, e); }
       }
     });
   }
@@ -73,6 +76,53 @@
     if (e.data === YT.PlayerState.PLAYING) {
       startSegmentTimer();
     }
+  }
+
+  /*
+   * 再生エラー（2:無効ID / 5:再生エラー / 100:削除・非公開 /
+   * 101・150:埋め込み無効）。公式MVは埋め込み無効が多いため、
+   * その曲はブロックして「表示せずにすぐ別の動画へ」切り替える。
+   */
+  function onError(slot, e) {
+    var song = slotSong[slot];
+    if (song) blocked[song.id] = true;
+
+    if (slot === activeSlot) {
+      skipUnavailable();          // 今見ている動画が再生不可 → 即スキップ
+    } else {
+      preloadNext();              // 裏で準備中の動画が再生不可 → 別候補を用意
+    }
+  }
+
+  // 再生不可の曲を、評価せず・履歴に残さずに飛ばして次へ
+  function skipUnavailable() {
+    clearTimers();
+
+    // 再生可能な曲が尽きていないかガード
+    var playable = window.SONGS.filter(function (s) { return s.id && !blocked[s.id]; });
+    if (!playable.length) {
+      $("npTitle").textContent = "再生できる曲が見つかりませんでした";
+      $("npArtist").textContent = "data.js の曲を見直してください";
+      return;
+    }
+
+    // 現在のエントリ（再生不可）は履歴から取り除く
+    if (histIndex >= 0 && history[histIndex] && history[histIndex].song === current) {
+      revertJudgement(history[histIndex]);
+      history.splice(histIndex, 1);
+      histIndex = Math.min(histIndex, history.length - 1);
+    }
+
+    if (!preloaded || blocked[preloaded.id]) preloadNext();
+    var next = preloaded;
+
+    crossfadeTo(next);
+    current = next;
+    history.push({ song: current, judged: null, applied: 0 });
+    histIndex = history.length - 1;
+    rememberRecent(current.id);
+    updateNowPlaying();
+    preloadNext();
   }
 
   // ===========================================================================
@@ -107,14 +157,17 @@
   // 選好スコアに基づく重み付きランダム選曲（条件フィルタ適用）
   function pickNext(excludeId) {
     var pool = window.SONGS.filter(function (s) {
-      return s.id && s.chorusStart >= 0 && passesFilter(s) &&
+      return s.id && !blocked[s.id] && s.chorusStart >= 0 && passesFilter(s) &&
              s.id !== excludeId && recent.indexOf(s.id) === -1;
     });
-    // フィルタ厳しすぎ / 出尽くした場合は recent を無視
+    // フィルタ厳しすぎ / 出尽くした場合は recent を無視（ブロック済みは常に除外）
     if (!pool.length) {
       pool = window.SONGS.filter(function (s) {
-        return s.id && passesFilter(s) && s.id !== excludeId;
+        return s.id && !blocked[s.id] && passesFilter(s) && s.id !== excludeId;
       });
+    }
+    if (!pool.length) {
+      pool = window.SONGS.filter(function (s) { return s.id && !blocked[s.id]; });
     }
     if (!pool.length) pool = window.SONGS.slice();
 
@@ -165,11 +218,12 @@
 
   function loadInto(slot, song, autoplay) {
     var p = playerFor(slot);
-    if (!p) return;
+    if (!p || !song) return;
+    slotSong[slot] = song;
     if (autoplay) {
       p.loadVideoById({ videoId: song.id, startSeconds: song.chorusStart });
     } else {
-      // プリロード（バッファのみ）
+      // プリロード（サビ位置からバッファ）
       p.cueVideoById({ videoId: song.id, startSeconds: song.chorusStart });
     }
   }
@@ -251,13 +305,13 @@
     preloadNext();
   }
 
-  // クロスフェードで裏のスロットへ
+  // クロスフェードで裏のスロットへ。必ずサビ(chorusStart)から再生する。
   function crossfadeTo(song) {
     var from = activeSlot, to = otherSlot(activeSlot);
     var pTo = playerFor(to);
-    // プリロード済みを再生
-    pTo.seekTo(song.chorusStart, true);
-    pTo.playVideo();
+    // プリロード済みでも確実にサビ頭から始めるため startSeconds を明示して読み込む
+    pTo.loadVideoById({ videoId: song.id, startSeconds: song.chorusStart });
+    slotSong[to] = song;
     setSlotActive(to);
     activeSlot = to;
     // フェード後に裏のプレイヤーを停止
