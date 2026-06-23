@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hylight — サビだけ、次々と。</title>
+  <meta name="description" content="サビから始まる曲を5秒〜20秒で次々再生。検索せず、好みに合う一曲に出会える音楽サイト。" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">Hylight</span>
+      <span class="tagline">サビだけ、次々と。</span>
+    </div>
+
+    <div class="controls">
+      <!-- 再生秒数 -->
+      <label class="ctrl">
+        <span class="ctrl-label">再生秒数</span>
+        <select id="duration">
+          <option value="5" selected>5秒</option>
+          <option value="10">10秒</option>
+          <option value="15">15秒</option>
+          <option value="20">20秒</option>
+        </select>
+      </label>
+
+      <!-- ジャンル -->
+      <label class="ctrl">
+        <span class="ctrl-label">ジャンル</span>
+        <select id="genre">
+          <option value="random" selected>ランダム</option>
+          <option value="pop">ポップ</option>
+          <option value="rock">ロック</option>
+          <option value="rnb">R&amp;B</option>
+          <option value="dance">ダンス</option>
+          <option value="ballad">バラード</option>
+        </select>
+      </label>
+
+      <!-- 雰囲気 -->
+      <label class="ctrl">
+        <span class="ctrl-label">雰囲気</span>
+        <select id="mood">
+          <option value="random" selected>ランダム</option>
+          <option value="bright">明るい</option>
+          <option value="dark">暗い</option>
+          <option value="sad">悲しい</option>
+          <option value="chill">落ち着く</option>
+          <option value="energetic">激しい</option>
+        </select>
+      </label>
+
+      <!-- 歌あり / インスト -->
+      <label class="ctrl">
+        <span class="ctrl-label">ボーカル</span>
+        <select id="vocal">
+          <option value="random" selected>どちらでも</option>
+          <option value="vocal">歌あり</option>
+          <option value="inst">インスト</option>
+        </select>
+      </label>
+
+      <!-- 言語 -->
+      <label class="ctrl">
+        <span class="ctrl-label">言語</span>
+        <select id="lang">
+          <option value="random" selected>ランダム</option>
+          <option value="jp">邦楽</option>
+          <option value="en">洋楽</option>
+        </select>
+      </label>
+    </div>
+  </header>
+
+  <main class="stage">
+    <!-- スタート用オーバーレイ（音声付き自動再生のためのユーザー操作） -->
+    <div id="startOverlay" class="start-overlay">
+      <div class="start-card">
+        <h1>Hylight</h1>
+        <p>サビから始まる曲が、<b>5秒</b>ごとに次々流れます。</p>
+        <p class="start-sub">気になったら動画をタップ → YouTubeへ。<br>「いいね」で似た曲が、放っておくと違う曲が流れます。</p>
+        <button id="startBtn" class="start-btn">▶ 再生をはじめる</button>
+      </div>
+    </div>
+
+    <div class="player-area">
+      <!-- 2つのプレイヤーを重ねてクロスフェード&プリロード -->
+      <div class="player-stack">
+        <div class="player-slot" id="slotA">
+          <div id="playerA"></div>
+          <div class="click-catch" data-slot="A" title="クリックでYouTubeを開く（=いいね）"></div>
+        </div>
+        <div class="player-slot" id="slotB">
+          <div id="playerB"></div>
+          <div class="click-catch" data-slot="B" title="クリックでYouTubeを開く（=いいね）"></div>
+        </div>
+
+        <!-- 残り時間プログレスバー -->
+        <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+
+        <!-- 楽曲情報 -->
+        <div class="now-playing">
+          <div class="np-text">
+            <span class="np-title" id="npTitle">読み込み中…</span>
+            <span class="np-artist" id="npArtist"></span>
+          </div>
+          <span class="np-badge" id="npJudge"></span>
+        </div>
+      </div>
+
+      <!-- 操作ボタン -->
+      <div class="actions">
+        <button class="act-btn" id="prevBtn" title="前の動画に戻る">⟵ 前の動画</button>
+        <button class="act-btn like-btn" id="likeBtn" title="この曲が好き（似た曲を流す）">♡ いいね</button>
+        <button class="act-btn" id="nextBtn" title="次の動画へ">次の動画 ⟶</button>
+      </div>
+
+      <!-- 説明 -->
+      <section class="howto">
+        <h2>使い方とおすすめの仕組み</h2>
+        <ul>
+          <li>🎵 <b>サビから自動再生</b>：どの曲も“サビ（盛り上がり）”から流れます。インストは一番のフックから。</li>
+          <li>⏱ <b>再生秒数</b>：右上で 5 / 10 / 15 / 20 秒に変更できます（初期値 5秒）。時間が来ると自動で次の曲へ。</li>
+          <li>👍 <b>「いいね」または動画クリック</b>＝<span class="good">良い</span>と判断 → <b>似た曲</b>を優先して流します。動画クリックで公式YouTubeが開きます。</li>
+          <li>👎 <b>最後まで流す（自動切替）／途中でスキップ</b>＝<span class="bad">好みでない</span>と判断 → <b>違う曲</b>を流します。</li>
+          <li>↩ <b>前の動画</b>に戻ってその動画を<b>クリック</b>すると、判断を<span class="good">良い</span>に変更できます。</li>
+          <li>🎛 <b>ジャンル・雰囲気・ボーカル・言語</b>を選ぶと、その条件に合う曲だけを流します（ランダムで全曲対象）。</li>
+          <li>✅ 収録曲は<b>公式チャンネル</b>のものを想定しています。</li>
+        </ul>
+      </section>
+    </div>
+  </main>
+
+  <script src="data.js"></script>
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script src="app.js"></script>
+</body>
+</html>
