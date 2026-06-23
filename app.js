@@ -31,6 +31,7 @@
   var histIndex = -1;       // history 内の現在位置
   var segTimer = null;      // 区間タイマー
   var progTimer = null;     // プログレス更新
+  var chorusEnforced = true; // 現在の再生でサビ位置補正済みか
   var apiReady = false;
   var started = false;
 
@@ -72,8 +73,18 @@
 
   function onState(slot, e) {
     if (slot !== activeSlot) return;
-    // 再生が始まったら区間タイマー開始
     if (e.data === YT.PlayerState.PLAYING) {
+      // 安全ネット：startSeconds が無視されて頭(0秒付近)から再生された場合、
+      // サビ位置へ強制シーク。区間タイマーはサビ到達後にカウント開始する。
+      var song = slotSong[slot];
+      if (!chorusEnforced && song) {
+        chorusEnforced = true;
+        var p = playerFor(slot);
+        var t = p.getCurrentTime ? p.getCurrentTime() : 0;
+        if (song.chorusStart > 1 && t < song.chorusStart - 1.5) {
+          p.seekTo(song.chorusStart, true);
+        }
+      }
       startSegmentTimer();
     }
   }
@@ -221,6 +232,7 @@
     if (!p || !song) return;
     slotSong[slot] = song;
     if (autoplay) {
+      chorusEnforced = false; // 新しい再生：サビ位置補正を再判定
       p.loadVideoById({ videoId: song.id, startSeconds: song.chorusStart });
     } else {
       // プリロード（サビ位置からバッファ）
@@ -310,6 +322,7 @@
     var from = activeSlot, to = otherSlot(activeSlot);
     var pTo = playerFor(to);
     // プリロード済みでも確実にサビ頭から始めるため startSeconds を明示して読み込む
+    chorusEnforced = false; // 新しい再生：サビ位置補正を再判定
     pTo.loadVideoById({ videoId: song.id, startSeconds: song.chorusStart });
     slotSong[to] = song;
     setSlotActive(to);
