@@ -31,6 +31,7 @@
   var histIndex = -1;       // history 内の現在位置
   var segTimer = null;      // 区間タイマー
   var progTimer = null;     // プログレス更新
+  var enforceTimer = null;  // サビ位置補正の再試行タイマー
   var chorusEnforced = true; // 現在の再生でサビ位置補正済みか
   var apiReady = false;
   var started = false;
@@ -73,20 +74,52 @@
 
   function onState(slot, e) {
     if (slot !== activeSlot) return;
+    // 再生が始まったらサビ位置への補正を開始（補正完了後に区間タイマー開始）
     if (e.data === YT.PlayerState.PLAYING) {
-      // 安全ネット：startSeconds が無視されて頭(0秒付近)から再生された場合、
-      // サビ位置へ強制シーク。区間タイマーはサビ到達後にカウント開始する。
-      var song = slotSong[slot];
-      if (!chorusEnforced && song) {
-        chorusEnforced = true;
-        var p = playerFor(slot);
-        var t = p.getCurrentTime ? p.getCurrentTime() : 0;
-        if (song.chorusStart > 1 && t < song.chorusStart - 1.5) {
-          p.seekTo(song.chorusStart, true);
-        }
-      }
-      startSegmentTimer();
+      if (!chorusEnforced && !enforceTimer) beginEnforce();
     }
+  }
+
+  /*
+   * サビ位置補正：startSeconds が無視されたり、読み込み直後のシークが
+   * バッファ処理で無効化される YouTube の癖に対応するため、サビ位置に
+   * 到達するまで一定間隔でシークを再試行する。到達してから秒数カウント開始。
+   */
+  function beginEnforce() {
+    clearEnforce();
+    var tries = 0;
+    enforceTimer = setInterval(function () {
+      var slot = activeSlot;
+      var p = playerFor(slot);
+      var song = slotSong[slot];
+      if (!p || !song || !p.getCurrentTime) return;
+      tries++;
+
+      var state = p.getPlayerState ? p.getPlayerState() : -1;
+      if (state !== YT.PlayerState.PLAYING) {
+        if (tries > 28) { finishEnforce(); } // ~7秒待っても再生せず→諦めて進める
+        return;
+      }
+
+      var target = song.chorusStart || 0;
+      var t = p.getCurrentTime();
+      if (target <= 1 || t >= target - 1.5) {
+        finishEnforce();            // サビ到達（または曲頭がサビ）
+      } else {
+        p.seekTo(target, true);     // まだ手前→シーク（失われても次tickで再試行）
+        if (tries > 28) finishEnforce();
+      }
+    }, 250);
+  }
+
+  function finishEnforce() {
+    chorusEnforced = true;
+    clearEnforce();
+    startSegmentTimer();            // サビ到達後に 5〜20秒のカウント開始
+  }
+
+  function clearEnforce() {
+    if (enforceTimer) { clearInterval(enforceTimer); enforceTimer = null; }
   }
 
   /*
@@ -282,6 +315,7 @@
   function clearTimers() {
     if (segTimer) { clearTimeout(segTimer); segTimer = null; }
     if (progTimer) { clearInterval(progTimer); progTimer = null; }
+    clearEnforce();
     $("progressBar").style.width = "0%";
   }
 
