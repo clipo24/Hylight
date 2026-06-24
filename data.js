@@ -1,9 +1,14 @@
 /*
- * Hylight 楽曲カタログ
+ * Hylight 楽曲カタログ（埋め込みOK中心）
  * -----------------------------------------------------------------------------
- * すべて「公式チャンネル（公式アーティスト / VEVO 等）」にアップロードされている
- * 楽曲を想定してキュレーションしています。video ID は公式アップロードを指します。
- * （再生できないものがあれば、その曲だけ差し替え / 削除してください）
+ * 埋め込み・共有が公式に許可されている著作権フリー音楽（NoCopyrightSounds = NCS
+ * 等）を中心に収録しています。これらは埋め込み再生がブロックされにくいため
+ * 「動画を再生できません」が起きにくく、サビ（ドロップ）から快適に流せます。
+ *
+ * ※ 実行環境から YouTube への接続がネットワークポリシーで遮断されているため、
+ *   各IDの実在・埋め込み可否は事前検証できていません。万一再生できないIDが
+ *   あっても、アプリ側が自動でスキップ＆ブロックし、一度出した曲は二度と
+ *   表示しません。再生できない曲が多い場合はIDを差し替えてください。
  *
  * 各フィールド:
  *   id          : YouTube の videoId（https://youtu.be/<id>）
@@ -11,37 +16,33 @@
  *   artist      : アーティスト名
  *   genre       : pop | rock | rnb | dance | ballad
  *   mood        : bright | dark | sad | chill | energetic
- *   lang        : jp | en          （邦楽 / 洋楽）
- *   vocal       : vocal | inst      （歌あり / インスト）
- *   chorusStart : サビ（インストは盛り上がり/フック）開始秒。ここから必ず再生。
+ *   lang        : jp | en
+ *   vocal       : vocal | inst
+ *   chorusStart : サビ（インスト/EDMはドロップ＝盛り上がり）開始秒
  * -----------------------------------------------------------------------------
  */
 window.SONGS = [
-  // ===== 邦楽 (jp) =====
-  { id: "ZRtdQ81jPUQ", title: "アイドル",         artist: "YOASOBI",            genre: "pop",    mood: "energetic", lang: "jp", vocal: "vocal", chorusStart: 53 },
-  { id: "TQ8WlA2GXbk", title: "Pretender",        artist: "Official髭男dism",   genre: "pop",    mood: "bright",    lang: "jp", vocal: "vocal", chorusStart: 60 },
-  { id: "SX_ViT4Ra7k", title: "Lemon",            artist: "米津玄師",            genre: "ballad", mood: "sad",       lang: "jp", vocal: "vocal", chorusStart: 61 },
-  { id: "ony539T074w", title: "白日",             artist: "King Gnu",           genre: "rock",   mood: "dark",      lang: "jp", vocal: "vocal", chorusStart: 72 },
-  { id: "GZjt_sA2eso", title: "ドライフラワー",   artist: "優里",                genre: "ballad", mood: "sad",       lang: "jp", vocal: "vocal", chorusStart: 64 },
-  { id: "rJGUTaJWBYw", title: "怪獣の花唄",       artist: "Vaundy",             genre: "rock",   mood: "bright",    lang: "jp", vocal: "vocal", chorusStart: 58 },
-  { id: "Qp3b-RXtz4w", title: "うっせぇわ",       artist: "Ado",                genre: "rock",   mood: "dark",      lang: "jp", vocal: "vocal", chorusStart: 49 },
-  { id: "kIyiD2Nfc14", title: "残響散歌",         artist: "Aimer",              genre: "rock",   mood: "energetic", lang: "jp", vocal: "vocal", chorusStart: 50 },
-  { id: "CwkzK-F0Y00", title: "紅蓮華",           artist: "LiSA",               genre: "rock",   mood: "energetic", lang: "jp", vocal: "vocal", chorusStart: 54 },
-  { id: "5y_Rh51tNBo", title: "夜に駆ける",       artist: "YOASOBI",            genre: "pop",    mood: "bright",    lang: "jp", vocal: "vocal", chorusStart: 48 },
-
-  // ===== 洋楽 (en) =====
-  { id: "4NRXx6U8ABQ", title: "Blinding Lights",  artist: "The Weeknd",         genre: "pop",    mood: "energetic", lang: "en", vocal: "vocal", chorusStart: 56 },
-  { id: "TUVcZfQe-Kw", title: "Levitating",       artist: "Dua Lipa",           genre: "dance",  mood: "bright",    lang: "en", vocal: "vocal", chorusStart: 49 },
-  { id: "JGwWNGJdvx8", title: "Shape of You",     artist: "Ed Sheeran",         genre: "pop",    mood: "bright",    lang: "en", vocal: "vocal", chorusStart: 44 },
-  { id: "fJ9rUzIMcZQ", title: "Bohemian Rhapsody",artist: "Queen",              genre: "rock",   mood: "dark",      lang: "en", vocal: "vocal", chorusStart: 175 },
-  { id: "dvgZkm1xWPE", title: "Viva la Vida",     artist: "Coldplay",           genre: "rock",   mood: "bright",    lang: "en", vocal: "vocal", chorusStart: 38 },
-  { id: "7wtfhZwyrcc", title: "Believer",         artist: "Imagine Dragons",    genre: "rock",   mood: "energetic", lang: "en", vocal: "vocal", chorusStart: 60 },
-  { id: "OPf0YbXqDm0", title: "Uptown Funk",      artist: "Mark Ronson ft. Bruno Mars", genre: "rnb", mood: "bright", lang: "en", vocal: "vocal", chorusStart: 73 },
-  { id: "rYEDA3JcQqw", title: "Rolling in the Deep", artist: "Adele",           genre: "rnb",    mood: "dark",      lang: "en", vocal: "vocal", chorusStart: 49 },
-  { id: "09R8_2nJtjg", title: "Sugar",            artist: "Maroon 5",           genre: "pop",    mood: "bright",    lang: "en", vocal: "vocal", chorusStart: 49 },
-  { id: "DyDfgMOUjCI", title: "bad guy",          artist: "Billie Eilish",      genre: "pop",    mood: "dark",      lang: "en", vocal: "vocal", chorusStart: 14 },
-
-  // ===== インスト (inst) =====
-  { id: "aHjpOzsQ9YI", title: "Crystallize",      artist: "Lindsey Stirling",   genre: "dance",  mood: "energetic", lang: "en", vocal: "inst", chorusStart: 64 },
-  { id: "OHwDi2zN8-c", title: "Roundtable Rival",  artist: "Lindsey Stirling",   genre: "rock",   mood: "energetic", lang: "en", vocal: "inst", chorusStart: 40 },
+  // ===== NCS / 著作権フリー（埋め込みOK想定） =====
+  { id: "bM7SZ5SBzyY", title: "Fade",                 artist: "Alan Walker",                 genre: "dance", mood: "energetic", lang: "en", vocal: "inst",  chorusStart: 59 },
+  { id: "AOeY-nDp7hI", title: "Spectre",              artist: "Alan Walker",                 genre: "dance", mood: "energetic", lang: "en", vocal: "inst",  chorusStart: 60 },
+  { id: "K4DyBUG242c", title: "On & On (ft. Daniel Levi)", artist: "Cartoon",                genre: "dance", mood: "bright",    lang: "en", vocal: "vocal", chorusStart: 60 },
+  { id: "3nQNiWdeH2Q", title: "Heroes Tonight (ft. Johnning)", artist: "Janji",              genre: "dance", mood: "bright",    lang: "en", vocal: "vocal", chorusStart: 60 },
+  { id: "TW9d8vYrVFQ", title: "Sky High",             artist: "Elektronomia",                genre: "dance", mood: "energetic", lang: "en", vocal: "inst",  chorusStart: 71 },
+  { id: "J2X5mJ3HDYE", title: "Invincible",           artist: "DEAF KEV",                    genre: "dance", mood: "energetic", lang: "en", vocal: "inst",  chorusStart: 79 },
+  { id: "jK2aIUmmdP4", title: "My Heart (ft. EH!DE)", artist: "Different Heaven",            genre: "rock",  mood: "energetic", lang: "en", vocal: "inst",  chorusStart: 60 },
+  { id: "EP625xQIGzs", title: "Hope",                 artist: "Tobu",                        genre: "dance", mood: "bright",    lang: "en", vocal: "inst",  chorusStart: 56 },
+  { id: "VtKbiyyVZks", title: "Cloud 9",              artist: "Itro & Tobu",                 genre: "dance", mood: "bright",    lang: "en", vocal: "inst",  chorusStart: 60 },
+  { id: "p7ZsBPK656s", title: "Blank",                artist: "Disfigure",                   genre: "dance", mood: "energetic", lang: "en", vocal: "inst",  chorusStart: 72 },
+  { id: "__CRWE-L45k", title: "Symbolism",            artist: "Electro-Light",               genre: "dance", mood: "bright",    lang: "en", vocal: "inst",  chorusStart: 60 },
+  { id: "yJg-Y5byMBw", title: "Different Heaven - Nekozilla", artist: "Different Heaven",     genre: "rock",  mood: "energetic", lang: "en", vocal: "inst",  chorusStart: 60 },
+  { id: "8GW6sLrK40k", title: "Why We Lose (ft. Coleman Trapp)", artist: "Cartoon",          genre: "dance", mood: "sad",       lang: "en", vocal: "vocal", chorusStart: 70 },
+  { id: "60ItHLz5WEA", title: "Faded",                artist: "Alan Walker",                 genre: "dance", mood: "sad",       lang: "en", vocal: "vocal", chorusStart: 80 },
+  { id: "yKlYJjGFXM4", title: "Janji - Heroes",       artist: "Janji",                       genre: "dance", mood: "bright",    lang: "en", vocal: "inst",  chorusStart: 58 },
+  { id: "pgN-vvVVuMA", title: "Dawn",                 artist: "Skylike",                     genre: "dance", mood: "chill",     lang: "en", vocal: "inst",  chorusStart: 55 },
+  { id: "vBGiFtb8Rpw", title: "Mortals (ft. Laura Brehm)", artist: "Warriyo",                genre: "dance", mood: "energetic", lang: "en", vocal: "vocal", chorusStart: 76 },
+  { id: "PKfxmFU3lWY", title: "Find Me",              artist: "Unknown Brain",               genre: "dance", mood: "bright",    lang: "en", vocal: "vocal", chorusStart: 70 },
+  { id: "RfP4D7gVi3c", title: "Lights",               artist: "Spektrem",                    genre: "dance", mood: "energetic", lang: "en", vocal: "inst",  chorusStart: 62 },
+  { id: "qpGsnD8E2_8", title: "Time Leap",            artist: "Andromedik",                  genre: "rock",  mood: "energetic", lang: "en", vocal: "inst",  chorusStart: 55 },
+  { id: "fM__lZkVnEM", title: "We Are (ft. Drowsy)",  artist: "T-Mass & Frainbreeze",        genre: "dance", mood: "bright",    lang: "en", vocal: "vocal", chorusStart: 60 },
+  { id: "n4tK7LYFvI0", title: "Force",                artist: "Alan Walker & YA & Sasrita",  genre: "dance", mood: "energetic", lang: "en", vocal: "inst",  chorusStart: 58 },
 ];

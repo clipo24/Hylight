@@ -14,7 +14,6 @@
   var FADE_MS = 600;        // クロスフェード時間
   var GOOD_DELTA = 1.0;     // 「良い」評価で各特徴に加算
   var BAD_DELTA = 0.34;     // 「悪い」評価で各特徴から減算
-  var NO_REPEAT = 6;        // 直近この曲数は再選択しない
   var TEMP = 0.9;           // 選好の効き具合（小さいほど選好を強く反映）
 
   // ---- 状態 ------------------------------------------------------------------
@@ -25,7 +24,7 @@
   var current = null;       // 再生中の曲
   var preloaded = null;     // 裏で準備済みの曲
   var prefs = {};           // 特徴トークン -> スコア
-  var recent = [];          // 直近に流した曲 id
+  var played = {};          // 一度でも表示した曲 id（二度と出さない）
   var blocked = {};         // 再生不可（埋め込み無効/削除等）の曲 id
   var history = [];         // { song, judged, applied } の配列（前後移動用）
   var histIndex = -1;       // history 内の現在位置
@@ -151,14 +150,6 @@
   function skipUnavailable() {
     clearTimers();
 
-    // 再生可能な曲が尽きていないかガード
-    var playable = window.SONGS.filter(function (s) { return s.id && !blocked[s.id]; });
-    if (!playable.length) {
-      $("npTitle").textContent = "再生できる曲が見つかりませんでした";
-      $("npArtist").textContent = "data.js の曲を見直してください";
-      return;
-    }
-
     // 現在のエントリ（再生不可）は履歴から取り除く
     if (histIndex >= 0 && history[histIndex] && history[histIndex].song === current) {
       revertJudgement(history[histIndex]);
@@ -168,12 +159,13 @@
 
     if (!preloaded || blocked[preloaded.id]) preloadNext();
     var next = preloaded;
+    if (!next) { showExhausted(); return; } // 再生可能な曲が尽きた
 
     crossfadeTo(next);
     current = next;
+    markPlayed(current);
     history.push({ song: current, judged: null, applied: 0 });
     histIndex = history.length - 1;
-    rememberRecent(current.id);
     updateNowPlaying();
     preloadNext();
   }
@@ -207,28 +199,21 @@
     return s;
   }
 
-  // 選好スコアに基づく重み付きランダム選曲（条件フィルタ適用）
+  /*
+   * 選好スコアに基づく重み付きランダム選曲。
+   * 再生済み(played)・ブロック済み(blocked)・現在の曲は絶対に選ばない。
+   * 出せる曲が無ければ null を返す（= 全曲出し切り）。
+   */
   function pickNext(excludeId) {
-    var notBlocked = window.SONGS.filter(function (s) { return s.id && !blocked[s.id]; });
-
-    // 1) 条件一致・現在の曲・直近の曲を除外
-    var pool = notBlocked.filter(function (s) {
-      return s.chorusStart >= 0 && passesFilter(s) &&
-             s.id !== excludeId && recent.indexOf(s.id) === -1;
+    // 二度と出さない：played / blocked / 現在の曲を完全除外
+    var avail = window.SONGS.filter(function (s) {
+      return s.id && !blocked[s.id] && !played[s.id] && s.id !== excludeId;
     });
-    // 2) 直近除外をはずす（現在の曲は引き続き除外）
-    if (!pool.length) {
-      pool = notBlocked.filter(function (s) {
-        return passesFilter(s) && s.id !== excludeId;
-      });
-    }
-    // 3) フィルタもはずす（現在の曲は引き続き除外＝同じ動画の連続を防ぐ）
-    if (!pool.length) {
-      pool = notBlocked.filter(function (s) { return s.id !== excludeId; });
-    }
-    // 4) 最後の手段：再生可能曲が現在の曲しかない場合のみ重複を許可
-    if (!pool.length) pool = notBlocked;
-    if (!pool.length) pool = window.SONGS.slice();
+    if (!avail.length) return null; // すべて出し切った
+
+    // 条件フィルタ優先。一致が無い場合は「再表示しない」を守るためフィルタを緩める
+    var pool = avail.filter(function (s) { return s.chorusStart >= 0 && passesFilter(s); });
+    if (!pool.length) pool = avail;
 
     // softmax 風の重み付け
     var weights = pool.map(function (s) { return Math.exp(scoreOf(s) / TEMP); });
@@ -241,9 +226,19 @@
     return pool[pool.length - 1];
   }
 
-  function rememberRecent(id) {
-    recent.push(id);
-    if (recent.length > NO_REPEAT) recent.shift();
+  // 表示した曲を記録（以後 pickNext で二度と選ばれない）
+  function markPlayed(song) {
+    if (song) played[song.id] = true;
+  }
+
+  // 全曲を出し切ったときの表示
+  function showExhausted() {
+    clearTimers();
+    $("npTitle").textContent = "すべての曲を再生しました 🎉";
+    $("npArtist").textContent = "ページを再読み込みすると最初から楽しめます";
+    var badge = $("npJudge");
+    badge.className = "np-badge";
+    badge.textContent = "";
   }
 
   // 評価の適用（applied を保持し、前の動画クリック時に取り消せるように）
@@ -295,9 +290,10 @@
 
   function playFirst() {
     current = pickNext(null);
+    if (!current) { showExhausted(); return; }
+    markPlayed(current);
     histIndex = 0;
     history = [{ song: current, judged: null, applied: 0 }];
-    rememberRecent(current.id);
 
     loadInto(activeSlot, current, true);
     setSlotActive(activeSlot);
@@ -305,10 +301,10 @@
     preloadNext();
   }
 
-  // 次の曲を裏のスロットへプリロード
+  // 次の曲を裏のスロットへプリロード（出せる曲が無ければ preloaded=null）
   function preloadNext() {
     preloaded = pickNext(current ? current.id : null);
-    loadInto(otherSlot(activeSlot), preloaded, false);
+    if (preloaded) loadInto(otherSlot(activeSlot), preloaded, false);
   }
 
   // 区間タイマー：指定秒経過で「自動切替（=悪い評価）」
@@ -351,6 +347,9 @@
       if (entry.judged !== "good") applyJudgement(entry, "bad");
     }
 
+    // 出せる曲が無ければ全曲出し切り
+    if (!preloaded) { showExhausted(); return; }
+
     // 履歴の途中から進む場合は先のものを破棄
     if (histIndex < history.length - 1) {
       history = history.slice(0, histIndex + 1);
@@ -359,9 +358,9 @@
     crossfadeTo(preloaded);
 
     current = preloaded;
+    markPlayed(current);
     history.push({ song: current, judged: null, applied: 0 });
     histIndex = history.length - 1;
-    rememberRecent(current.id);
     updateNowPlaying();
     preloadNext();
   }
@@ -389,7 +388,6 @@
     histIndex -= 1;
     var entry = history[histIndex];
     current = entry.song;
-    preloaded = history[histIndex + 1] ? history[histIndex + 1].song : null;
 
     // 裏スロットへ読み込んでフェードで前面に
     var to = otherSlot(activeSlot);
@@ -418,7 +416,6 @@
     if (!current) return;
     applyJudgement(history[histIndex], "good");
     updateNowPlaying();
-    rememberRecent(current.id);
     preloadNext(); // 次の候補を「良い」基準で取り直す
     window.open("https://www.youtube.com/watch?v=" + current.id, "_blank", "noopener");
   }
