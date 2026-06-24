@@ -222,6 +222,12 @@ html, body {
   box-shadow: 0 8px 26px rgba(255,77,125,0.35);
 }
 .start-btn:active { transform: scale(0.97); }
+.start-btn:disabled {
+  opacity: 0.55;
+  cursor: progress;
+  background: #3a3d4a;
+  box-shadow: none;
+}
 
 @media (max-width: 560px) {
   .tagline { display: none; }

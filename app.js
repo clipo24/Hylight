@@ -60,11 +60,20 @@
         playsinline: 1, iv_load_policy: 3, fs: 0
       },
       events: {
-        onReady: function () { ready[slot] = true; maybeStart(); },
+        onReady: function () { ready[slot] = true; onPlayerReady(); },
         onStateChange: function (e) { onState(slot, e); },
         onError: function (e) { onError(slot, e); }
       }
     });
+  }
+
+  // 両プレイヤー準備完了で開始ボタンを有効化（必ずクリック操作内で再生開始させる）
+  function onPlayerReady() {
+    if (ready.A && ready.B) {
+      var btn = $("startBtn");
+      if (btn) { btn.disabled = false; btn.textContent = "▶ 再生をはじめる"; }
+      maybeStart();
+    }
   }
 
   function maybeStart() {
@@ -200,19 +209,25 @@
 
   // 選好スコアに基づく重み付きランダム選曲（条件フィルタ適用）
   function pickNext(excludeId) {
-    var pool = window.SONGS.filter(function (s) {
-      return s.id && !blocked[s.id] && s.chorusStart >= 0 && passesFilter(s) &&
+    var notBlocked = window.SONGS.filter(function (s) { return s.id && !blocked[s.id]; });
+
+    // 1) 条件一致・現在の曲・直近の曲を除外
+    var pool = notBlocked.filter(function (s) {
+      return s.chorusStart >= 0 && passesFilter(s) &&
              s.id !== excludeId && recent.indexOf(s.id) === -1;
     });
-    // フィルタ厳しすぎ / 出尽くした場合は recent を無視（ブロック済みは常に除外）
+    // 2) 直近除外をはずす（現在の曲は引き続き除外）
     if (!pool.length) {
-      pool = window.SONGS.filter(function (s) {
-        return s.id && !blocked[s.id] && passesFilter(s) && s.id !== excludeId;
+      pool = notBlocked.filter(function (s) {
+        return passesFilter(s) && s.id !== excludeId;
       });
     }
+    // 3) フィルタもはずす（現在の曲は引き続き除外＝同じ動画の連続を防ぐ）
     if (!pool.length) {
-      pool = window.SONGS.filter(function (s) { return s.id && !blocked[s.id]; });
+      pool = notBlocked.filter(function (s) { return s.id !== excludeId; });
     }
+    // 4) 最後の手段：再生可能曲が現在の曲しかない場合のみ重複を許可
+    if (!pool.length) pool = notBlocked;
     if (!pool.length) pool = window.SONGS.slice();
 
     // softmax 風の重み付け
@@ -430,16 +445,21 @@
   // ===========================================================================
   function start() {
     if (started) return;
+    // プレイヤー未準備ならまだ開始しない（自動再生ブロックで止まるのを防ぐ）
+    if (!(apiReady && ready.A && ready.B)) return;
     started = true;
     $("startOverlay").classList.add("hidden");
-    if (apiReady && ready.A && ready.B) {
-      playFirst();
-    }
-    // まだ API 準備中なら maybeStart() が拾う
+    playFirst(); // 必ずクリック操作の中で再生開始 → 音ありで再生される
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    $("startBtn").addEventListener("click", start);
+    // 準備完了まで開始ボタンを無効化（onPlayerReady で有効化）
+    var sb = $("startBtn");
+    sb.disabled = true;
+    sb.textContent = "読み込み中…";
+    sb.addEventListener("click", start);
+    // API がすでに準備済みなら（稀）ボタンを有効化
+    onPlayerReady();
     $("nextBtn").addEventListener("click", function () { advance("skip"); });
     $("prevBtn").addEventListener("click", goPrev);
     $("likeBtn").addEventListener("click", likeCurrent);
